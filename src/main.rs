@@ -1,12 +1,14 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case)] //This removes the warning from non snake case variable names
 
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use reqwest::Error;
-use tokio::time::{sleep, Duration};
-use std::env;
+//Imports
+use serde::{Deserialize, Serialize}; //Used for serializing (Convert for easy storage and use) data
+use serde_json::json; //Used for creating JSon files
+use reqwest::Error; //Used for handling errors related to HTTP requests
+use tokio::time::{sleep, Duration}; //Used for async/await and time-based operations such as sleep
+use std::env; //Used for environmental variables
 
-#[derive(Debug, Serialize, Deserialize)]
+//Storing the data
+#[derive(Debug, Serialize, Deserialize)] //This stores data under ScoreStats
 struct ScoreStats {
     totalScore: i64,
     totalRankedScore: i64,
@@ -15,8 +17,8 @@ struct ScoreStats {
     rankedPlayCount: i64,
     replaysWatched: i64,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
+//
+#[derive(Debug, Serialize, Deserialize)] //This is where all the data is stored (PlayerData)
 struct PlayerData {
     id: String,
     name: String,
@@ -32,97 +34,103 @@ struct PlayerData {
     firstSeen: String,
 }
 
-async fn fetch_player_data() -> Result<PlayerData, Error> {
-    let url = "https://scoresaber.com/api/player/76561199396123565/full";
-    let response = reqwest::get(url).await?.json::<PlayerData>().await?;
-    Ok(response)
+//Function used to fetch/take in the data
+async fn fetch_player_data() -> Result<PlayerData, Error> { //Name of function and stating return type
+    let url = "https://scoresaber.com/api/player/76561199396123565/full"; //The url used to take in date (In this case it is my username)
+    let response = reqwest::get(url).await?.json::<PlayerData>().await?; //Line to actually take the data in
+    Ok(response) //Returns response
 }
 
-async fn send_to_discord(data: &PlayerData) -> Result<(), Error> {
-    let webhook_url = env::var("WEBHOOK_URL").unwrap_or_else(|_| String::from("Invalid webhook URL"));
+//Function to send data to discord
+async fn send_to_discord(data: &PlayerData) -> Result<(), Error> { //Name of function and stating return type
+    let webhook_url = env::var("WEBHOOK_URL").unwrap_or_else(|_| String::from("Invalid webhook URL")); //Pulls WEBHOOK_URL from environment, if unable then prints invalid
     if webhook_url == "Invalid webhook URL" {
         println!("{}", webhook_url);
     }
     
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::new(); //Setting the client
     
-    let firstSeen_formatted = &data.firstSeen[0..10];
+    let firstSeen_formatted = &data.firstSeen[0..10]; //Condencing the firstSeen variable to exclude time
 
-    let payload = json!({
+    //Formatting the data being sent
+    let payload = json!({ //The data is put in a JSon file for the discord webhook
         "embeds": [{
             "author": {
-                "name": format!("{} #{}", data.name, data.rank),
-                "icon_url": format!("{}",data.profilePicture)
+                "name": format!("{} #{}", data.name, data.rank), //Username and global rank
+                "icon_url": format!("{}",data.profilePicture) //Profile Picture
             },
             "color": 5505024,
             "fields": [
                 {
                     "name": "Description",
-                    "value": format!("Country Rank: **#{}** ({})\nFirst Seen: {}", data.countryRank, data.country, firstSeen_formatted)
+                    "value": format!("Country Rank: **#{}** ({})\nFirst Seen: {}", data.countryRank, data.country, firstSeen_formatted) //Country, Country Rank, and date first seen
                 },
-                {"name": "","value": ""},
+                {"name": "","value": ""}, //These are just for cosmetic purposes, they ensure that only two fields are in each row
                 {
                     "name": "Total Score",
-                    "value": format!("{}", data.scoreStats.totalScore),
-                    "inline": true
+                    "value": format!("{}", data.scoreStats.totalScore), //Total Score
+                    "inline": true //This states that this field and up to 2 other fields are in the same row
                 },
                 {
                     "name": "Total Ranked Score",
-                    "value": format!("{}", data.scoreStats.totalRankedScore),
+                    "value": format!("{}", data.scoreStats.totalRankedScore), //Total Ranked Score
                     "inline": true             
                 },
                 {"name": "","value": ""},
                 {
                     "name": "Average Ranked Accuracy",
-                    "value": format!("%{}", data.scoreStats.averageRankedAccuracy),
+                    "value": format!("%{}", data.scoreStats.averageRankedAccuracy), //Average Ranked Accuracy
                     "inline": true
                 },
                 {
                     "name": "Performance Point (PP)",
-                    "value": format!("{}", data.pp),
-                    "inline": true             
+                    "value": format!("{}", data.pp), //Performance Points
+                    "inline": true
                 },
                 {"name": "","value": ""},
                 {
                     "name": "Ranked Play Count",
-                    "value": format!("{}", data.scoreStats.rankedPlayCount),
+                    "value": format!("{}", data.scoreStats.rankedPlayCount), //Ranked Play Count
                     "inline": true
                 },
                 {
                     "name": "Total Play Count",
-                    "value": format!("{}", data.scoreStats.totalPlayCount),
+                    "value": format!("{}", data.scoreStats.totalPlayCount), //Total Play Count
                     "inline": true             
                 }
             ]
         }]
     });
     
+    //Sends to discord
     let response = client.post(webhook_url)
         .json(&payload)
         .send()
         .await?;
     
+    //Checks if it worked properly
     if response.status().is_success() {
-        println!("Message sent successfully to Discord");
+        println!("Message sent successfully to Discord"); //Prints if successful
     } else {
-        println!("Failed to send message to Discord: {}", response.status());
+        println!("Failed to send message to Discord: {}", response.status()); //Prints if failure
     }
     
-    Ok(())
+    Ok(()) //Returns OK
 }
 
+//Main function
 #[tokio::main]
 async fn main() {
-    loop {
-        match fetch_player_data().await {
+    loop { //Loops every 10 minutes
+        match fetch_player_data().await { //Checks if fetching data goes successfully
             Ok(data) => {
                 if let Err(e) = send_to_discord(&data).await {
-                    println!("Error sending to Discord: {}", e);
+                    println!("Error sending to Discord: {}", e); //Prints if sending to discord results in failure
                 }
             },
-            Err(e) => println!("Error: {}", e),
+            Err(e) => println!("Error: {}", e), //Prints if fetching data results in failure
         }
         
-        sleep(Duration::from_secs(600)).await;
+        sleep(Duration::from_secs(600)).await; //Waits 10 minutes before looping
     }
 }
