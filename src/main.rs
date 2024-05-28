@@ -42,7 +42,7 @@ async fn fetch_player_data() -> Result<PlayerData, Error> { //Name of function a
 }
 
 //Function to send data to discord
-async fn send_to_discord(data: &PlayerData) -> Result<(), Error> { //Name of function and stating return type
+async fn send_to_discord(data: &PlayerData, success_count: &mut i64) -> Result<(), Error> { // Name of function and stating return type
     let webhook_url = env::var("WEBHOOK_URL").unwrap_or_else(|_| String::from("Invalid webhook URL")); //Pulls WEBHOOK_URL from environment, if unable then prints invalid
     if webhook_url == "Invalid webhook URL" {
         println!("{}", webhook_url);
@@ -110,7 +110,8 @@ async fn send_to_discord(data: &PlayerData) -> Result<(), Error> { //Name of fun
     
     //Checks if it worked properly
     if response.status().is_success() {
-        println!("Message sent successfully to Discord"); //Prints if successful
+        *success_count += 1; // Increment the success count
+        println!("Message sent successfully to Discord [Success Count: {}]", success_count); // Prints if successful
     } else {
         println!("Failed to send message to Discord: {}", response.status()); //Prints if failure
     }
@@ -121,16 +122,16 @@ async fn send_to_discord(data: &PlayerData) -> Result<(), Error> { //Name of fun
 //Main function
 #[tokio::main]
 async fn main() {
+    let mut success_count: i64 = 0; //Goes up every time the loop runs
     loop { //Loops every 10 minutes
         match fetch_player_data().await { //Checks if fetching data goes successfully
             Ok(data) => {
-                if let Err(e) = send_to_discord(&data).await {
+                if let Err(e) = send_to_discord(&data, &mut success_count).await {
                     println!("Error sending to Discord: {}", e); //Prints if sending to discord results in failure
                 }
             },
             Err(e) => println!("Error: {}", e), //Prints if fetching data results in failure
         }
-        
-        sleep(Duration::from_secs(600)).await; //Waits 10 minutes before looping
+        sleep(Duration::from_secs(6)).await; //Waits 10 minutes before looping
     }
 }
