@@ -8,7 +8,7 @@ use tokio::time::{sleep, Duration}; //Used for async/await and time-based operat
 use std::env; //Used for environmental variables
 use rusqlite::{params, Connection, Result}; //Used to integrate database (SQLite) functions
 
-//Storing the data
+//Storing the data from ScoreSaber API
 #[derive(Debug, Serialize, Deserialize)] //This stores data under ScoreStats
 struct ScoreStats {
     totalScore: i64,
@@ -96,6 +96,41 @@ fn insert_player_data(conn: &Connection, data: &PlayerData) -> Result<()> {
         ],
     )?;
     Ok(())
+}
+
+//Fetch player data from database
+fn fetch_player_data_from_db(conn: &Connection) -> Result<Vec<PlayerData>> {
+    let mut stmt = conn.prepare("SELECT *, name FROM player_data")?; // Prepare the query (All data in player_data)
+    let rows = stmt.query_map(params![], |row| { //Execution and formatt of the query (query = request for data)
+        Ok(PlayerData { //Using the same struct
+            id: row.get(0)?,
+            name: row.get(1)?,
+            profilePicture: row.get(2)?,
+            country: row.get(3)?,
+            pp: row.get(4)?,
+            rank: row.get(5)?,
+            countryRank: row.get(6)?,
+            histories: row.get(7)?,
+            banned: row.get(8)?,
+            inactive: row.get(9)?,
+            scoreStats: ScoreStats {
+                totalScore: row.get(10)?,
+                totalRankedScore: row.get(11)?,
+                averageRankedAccuracy: row.get(12)?,
+                totalPlayCount: row.get(13)?,
+                rankedPlayCount: row.get(14)?,
+                replaysWatched: row.get(15)?,
+            },
+            firstSeen: row.get(16)?,
+        })
+    })?;
+
+    let mut player_data_vec = Vec::new(); //Make vector
+    for row in rows { // Collect the results into a vector
+        player_data_vec.push(row?);
+    }
+
+    Ok(player_data_vec) //Returns data and show that the function worked properly
 }
 
 //Function to add commas
@@ -203,6 +238,16 @@ async fn main() {
     let mut success_count: i64 = 0; //Goes up every time the loop runs
     let conn = Connection::open("player_data.db").expect("Failed to open database"); //Set up connection
     loop { //Loops every 10 minutes
+        match fetch_player_data_from_db(&conn) {
+            Ok(player_data_from_db) => {
+                for data in player_data_from_db {
+                    println!("{:?}", data);
+                }
+            }
+            Err(err) => {
+                eprintln!("Error: {:?}", err);
+            }
+        }
         match fetch_player_data().await { //Checks if fetching data goes successfully
             Ok(data) => {
                 if let Err(e) = insert_player_data(&conn, &data) { //Call function to insert data into databas
