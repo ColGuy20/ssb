@@ -37,7 +37,8 @@ struct PlayerData {
 
 //Function used to fetch/take in the data from Scoresaber
 async fn fetch_player_data() -> Result<PlayerData, Error> { //Name of function and stating return type
-    let url = "https://scoresaber.com/api/player/76561199396123565/full"; //The url used to take in date (In this case it is my username)
+    let id = "76561199396123565"; //My steam/score saber ID
+    let url = "https://scoresaber.com/api/player/".to_owned()+id+"/full"; //The url used to take in date (In this case it is my username)
     let response = reqwest::get(url).await?.json::<PlayerData>().await?; //Line to actually take the data in
     Ok(response) //Returns response
 }
@@ -97,6 +98,21 @@ fn insert_player_data(conn: &Connection, data: &PlayerData) -> Result<()> {
     Ok(())
 }
 
+//Function to add commas
+fn add_commas(mut num: i64) -> String {
+    let mut result = String::new(); //Sets new string
+    let mut count = 0; //Sets up count (Every 3 nums)
+    while num > 0 { //while there is still more to the number
+        if count != 0 && count % 3 == 0 { //If the count is divisible by three then add comma
+            result.insert(0, ',');
+        }
+        result.insert(0, (b'0' + (num % 10) as u8) as char); //adds num to answer (result)
+        num /= 10; //shifts to next place
+        count += 1; //increment
+    }
+    result //return answer
+}
+
 //Function to send data to discord
 async fn send_to_discord(data: &PlayerData, success_count: &mut i64) -> Result<(), Error> { // Name of function and stating return type
     let webhook_url = env::var("WEBHOOK_URL").unwrap_or_else(|_| String::from("Invalid webhook URL")); //Pulls WEBHOOK_URL from environment, if unable then prints invalid
@@ -106,6 +122,12 @@ async fn send_to_discord(data: &PlayerData, success_count: &mut i64) -> Result<(
     
     let client = reqwest::Client::new(); //Setting the client
     
+    //Formatting data
+    let totalScore_formatted = add_commas(data.scoreStats.totalScore); //add commas
+    let totalRankedScore_formatted = add_commas(data.scoreStats.totalRankedScore);
+    let totalPlayCount_formatted = add_commas(data.scoreStats.totalPlayCount);
+    let rankedPlayCount_formatted = add_commas(data.scoreStats.rankedPlayCount);
+    //
     let firstSeen_formatted = &data.firstSeen[0..10]; //Condencing the firstSeen variable to exclude time
 
     //Formatting the data being sent
@@ -124,12 +146,12 @@ async fn send_to_discord(data: &PlayerData, success_count: &mut i64) -> Result<(
                 {"name": "","value": ""}, //These are just for cosmetic purposes, they ensure that only two fields are in each row
                 {
                     "name": "Total Score",
-                    "value": format!("{}", data.scoreStats.totalScore), //Total Score
+                    "value": format!("{}", totalScore_formatted), //Total Score
                     "inline": true //This states that this field and up to 2 other fields are in the same row
                 },
                 {
                     "name": "Total Ranked Score",
-                    "value": format!("{}", data.scoreStats.totalRankedScore), //Total Ranked Score
+                    "value": format!("{}", totalRankedScore_formatted), //Total Ranked Score
                     "inline": true             
                 },
                 {"name": "","value": ""},
@@ -146,12 +168,12 @@ async fn send_to_discord(data: &PlayerData, success_count: &mut i64) -> Result<(
                 {"name": "","value": ""},
                 {
                     "name": "Ranked Play Count",
-                    "value": format!("{}", data.scoreStats.rankedPlayCount), //Ranked Play Count
+                    "value": format!("{}", rankedPlayCount_formatted), //Ranked Play Count
                     "inline": true
                 },
                 {
                     "name": "Total Play Count",
-                    "value": format!("{}", data.scoreStats.totalPlayCount), //Total Play Count
+                    "value": format!("{}", totalPlayCount_formatted), //Total Play Count
                     "inline": true             
                 }
             ]
@@ -192,6 +214,7 @@ async fn main() {
             },
             Err(e) => println!("Error: {}", e), //Prints if fetching data results in failure
         }
-        sleep(Duration::from_secs(600)).await; //Waits 10 minutes before looping
+        let cooldown:u64 = 600; //Sets cooldown (in secs, 10 mins)
+        sleep(Duration::from_secs(cooldown)).await; //Waits 10 minutes before looping
     }
 }

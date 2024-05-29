@@ -1,0 +1,29 @@
+[33mcommit 9c67e97053007f0654d8351f77c280c6dc40d1ce[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: ColGuy20 <sebaxbox0.o@gmail.com>
+Date:   Wed May 29 14:20:13 2024 -0500
+
+    Functioning ScoreSaber Discord Webhook (V1.2) [Added Input Data to DB, NO FETCH DATA FROM DB]
+
+[33mcommit da367c30a52979c2ff5ac837b9ab65bf2ecb46ee[m[33m ([m[1;31morigin/branch1[m[33m)[m
+Author: ColGuy20 <sebaxbox0.o@gmail.com>
+Date:   Tue May 28 14:13:33 2024 -0500
+
+    Functioning ScoreSaber Discord Webhook (V1.1) (Added Count, NO DB);
+
+[33mcommit 2ab2ef447179a3fffd837933455006ba9b4a65ba[m
+Author: ColGuy20 <sebaxbox0.o@gmail.com>
+Date:   Mon May 27 23:26:08 2024 -0500
+
+    Functioning ScoreSaber Discord Webhook (NO DB)
+
+[33mcommit 402b04eee336eb3c03df95c52b63319c8b14a7b3[m
+Author: ColGuy20 <sebaxbox0.o@gmail.com>
+Date:   Mon May 27 22:06:34 2024 -0500
+
+    Fucntioning Commit (NO DB)
+
+[33mcommit 2a07205bbd2f62686465d48ccb892c32621b217f[m
+Author: ColGuy20 <sebaxbox0.o@gmail.com>
+Date:   Mon May 27 22:05:05 2024 -0500
+
+    Functioning commit (NO DB)
