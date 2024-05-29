@@ -6,6 +6,7 @@ use serde_json::json; //Used for creating JSon files
 use reqwest::Error; //Used for handling errors related to HTTP requests
 use tokio::time::{sleep, Duration}; //Used for async/await and time-based operations such as sleep
 use std::env; //Used for environmental variables
+use rusqlite::{params, Connection, Result}; //Used to integrate database (SQLite) functions
 
 //Storing the data
 #[derive(Debug, Serialize, Deserialize)] //This stores data under ScoreStats
@@ -34,11 +35,66 @@ struct PlayerData {
     firstSeen: String,
 }
 
-//Function used to fetch/take in the data
+//Function used to fetch/take in the data from Scoresaber
 async fn fetch_player_data() -> Result<PlayerData, Error> { //Name of function and stating return type
     let url = "https://scoresaber.com/api/player/76561199396123565/full"; //The url used to take in date (In this case it is my username)
     let response = reqwest::get(url).await?.json::<PlayerData>().await?; //Line to actually take the data in
     Ok(response) //Returns response
+}
+
+// Function to insert data into database
+fn insert_player_data(conn: &Connection, data: &PlayerData) -> Result<()> {
+    //Creates a table if there is none
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS player_data (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            profilePicture TEXT,
+            country TEXT,
+            pp REAL,
+            rank INTEGER,
+            countryRank INTEGER,
+            histories TEXT,
+            banned INTEGER,
+            inactive INTEGER,
+            totalScore INTEGER,
+            totalRankedScore INTEGER,
+            averageRankedAccuracy REAL,
+            totalPlayCount INTEGER,
+            rankedPlayCount INTEGER,
+            replaysWatched INTEGER,
+            firstSeen TEXT
+        )",
+        params![],
+    )?;
+    //Inserts or Replaces data in the data base
+    conn.execute(
+        "INSERT OR REPLACE INTO player_data (
+            id, name, profilePicture, country, pp, rank, countryRank, histories, banned, inactive, 
+            totalScore, totalRankedScore, averageRankedAccuracy, totalPlayCount, rankedPlayCount, 
+            replaysWatched, firstSeen
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+        params![
+            data.id,
+            data.name,
+            data.profilePicture,
+            data.country,
+            data.pp,
+            data.rank,
+            data.countryRank,
+            data.histories,
+            data.banned,
+            data.inactive,
+            data.scoreStats.totalScore,
+            data.scoreStats.totalRankedScore,
+            data.scoreStats.averageRankedAccuracy,
+            data.scoreStats.totalPlayCount,
+            data.scoreStats.rankedPlayCount,
+            data.scoreStats.replaysWatched,
+            data.firstSeen
+        ],
+    )?;
+    Ok(())
 }
 
 //Function to send data to discord
@@ -123,15 +179,19 @@ async fn send_to_discord(data: &PlayerData, success_count: &mut i64) -> Result<(
 #[tokio::main]
 async fn main() {
     let mut success_count: i64 = 0; //Goes up every time the loop runs
+    let conn = Connection::open("player_data.db").expect("Failed to open database"); //Set up connection
     loop { //Loops every 10 minutes
         match fetch_player_data().await { //Checks if fetching data goes successfully
             Ok(data) => {
-                if let Err(e) = send_to_discord(&data, &mut success_count).await {
+                if let Err(e) = insert_player_data(&conn, &data) { //Call function to insert data into databas
+                    println!("Error inserting data into database: {}", e); //Prints if inputing data into database results in failure
+                }
+                if let Err(e) = send_to_discord(&data, &mut success_count).await { //Call function to send data to discord
                     println!("Error sending to Discord: {}", e); //Prints if sending to discord results in failure
                 }
             },
             Err(e) => println!("Error: {}", e), //Prints if fetching data results in failure
         }
-        sleep(Duration::from_secs(6)).await; //Waits 10 minutes before looping
+        sleep(Duration::from_secs(600)).await; //Waits 10 minutes before looping
     }
 }
