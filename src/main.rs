@@ -37,7 +37,7 @@ struct PlayerData {
 }
 
 //Struct for changes in new-old
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)] //This struct has default in case of new user (for send_data_to_discord)
 struct Changes{
     pp: bool,
     pp_change: f64,
@@ -60,15 +60,14 @@ struct Changes{
 }
 
 //Function used to fetch/take in the data from Scoresaber
-async fn fetch_player_data() -> Result<PlayerData, Error> { //Name of function and stating return type
-    let id = "76561199396123565"; //My steam/score saber ID
-    let url = "https://scoresaber.com/api/player/".to_owned()+id+"/full"; //The url used to take in date (In this case it is my username)
+async fn fetch_player_data(player_id: &str) -> Result<PlayerData, Error> { //Name of function and stating return type
+    let url = "https://scoresaber.com/api/player/".to_owned()+player_id+"/full"; //The url used to take in date (In this case it is my username)
     let response = reqwest::get(url).await?.json::<PlayerData>().await?; //Line to actually take the data in
     Ok(response) //Returns response
 }
 
 // Function to insert data into database
-fn insert_player_data(conn: &Connection, data: &PlayerData) -> Result<()> {
+fn insert_player_data(conn: &Connection, data: &PlayerData, player_id: &str) -> Result<()> {
     //Creates a table if there is none
     conn.execute(
         "CREATE TABLE IF NOT EXISTS player_data (
@@ -94,13 +93,13 @@ fn insert_player_data(conn: &Connection, data: &PlayerData) -> Result<()> {
     )?;
     //Inserts or Replaces data in the data base
     conn.execute(
-        "INSERT OR REPLACE INTO player_data (
+        "INSERT OR REPLACE INTO player_data(
             id, name, profilePicture, country, pp, rank, countryRank, histories, banned, inactive, 
             totalScore, totalRankedScore, averageRankedAccuracy, totalPlayCount, rankedPlayCount, 
             replaysWatched, firstSeen
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
-            data.id,
+            player_id,
             data.name,
             data.profilePicture,
             data.country,
@@ -123,11 +122,11 @@ fn insert_player_data(conn: &Connection, data: &PlayerData) -> Result<()> {
 }
 
 //Fetch player data from database
-fn fetch_player_data_from_db(conn: &Connection) -> Result<PlayerData, rusqlite::Error> {
-    let mut stmt = conn.prepare("SELECT *, name FROM player_data")?; // Prepare the query
-    let mut rows = stmt.query(params![])?; // Execute the query
+fn fetch_player_data_from_db(conn: &Connection, player_id: &str) -> Result<PlayerData, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT *, name FROM player_data WHERE id = ?1")?; // Prepare the query
+    let mut rows = stmt.query(params![player_id])?; // Execute the query
 
-    if let Some(row) = rows.next()? { // Fetch the first row
+    if let Some(row) = rows.next()? { // If there is a row that matches the parameters
         let player_data = PlayerData { // Map the row to the PlayerData struct
             id: row.get(0)?,
             name: row.get(1)?,
@@ -150,8 +149,8 @@ fn fetch_player_data_from_db(conn: &Connection) -> Result<PlayerData, rusqlite::
             firstSeen: row.get(16)?,
         };
         Ok(player_data) // Return the single PlayerData
-    } else {
-        Err(rusqlite::Error::QueryReturnedNoRows) // Handle the case where no rows are returned
+    } else { // If there is not a row that matches the paramaters
+        Err(rusqlite::Error::QueryReturnedNoRows) // Send back an error letting know that no row was found
     }
 }
 
@@ -279,7 +278,7 @@ fn add_commas(mut num: i64, include_pos: bool) -> String {
 }
 
 //Function to send data to discord
-async fn send_to_discord(data: &PlayerData, changes: &Changes, success_count: &mut i64) -> Result<(), Error> { // Name of function and stating return type
+async fn send_data_to_discord(data: &PlayerData, changes: &Changes, success_count: &mut i64, new_user: bool) -> Result<(), Error> { // Name of function and stating return type
     let webhook_url = env::var("WEBHOOK_URL").unwrap_or_else(|_| String::from("Invalid webhook URL")); //Pulls WEBHOOK_URL from environment, if unable then prints invalid
     if webhook_url == "Invalid webhook URL" {
         println!("{}", webhook_url);
@@ -299,43 +298,56 @@ async fn send_to_discord(data: &PlayerData, changes: &Changes, success_count: &m
     let mut averageRankedAccuracy_formatted = format!("{}", data.scoreStats.averageRankedAccuracy); //Make formatted var
     let firstSeen_formatted = &data.firstSeen[0..10]; //Condencing the firstSeen variable to exclude time
 
-    //Implementing changes
-    if changes.tScore{ //If there is a change
-        totalScore_formatted += &format!("\n`{}`", add_commas(changes.tScore_change, true)); //Add the change after adding commas to the change
+    //Implementing changes to payload if it is not a new user 
+    if !new_user{ //If not new user
+        //Implementing changes
+        if changes.tScore{ //If there is a change
+            totalScore_formatted += &format!("\n`{}`", add_commas(changes.tScore_change, true)); //Add the change after adding commas to the change
+        }
+        if changes.rScore{
+            totalRankedScore_formatted += &format!("\n`{}`", add_commas(changes.rScore_change, true));
+        }
+        if changes.tCount{
+            totalPlayCount_formatted += &format!(" `{}`", add_commas(changes.tCount_change, true));
+        }
+        if changes.rCount{
+            rankedPlayCount_formatted += &format!(" `{}`", add_commas(changes.rCount_change, true));
+        }
+        if changes.replays{
+            replaysWatched_formatted += &format!("\n`{}`", add_commas(changes.replays_change, true));
+        }
+        if changes.rank{
+            rank_formatted += &format!(" `{}`", add_commas(changes.rank_change, true));
+        }
+        if changes.cRank{
+            countryRank_formatted += &format!(" `{}`", add_commas(changes.cRank_change, true));
+        }
+        if changes.pp{
+            pp_formatted += &format!("\n`{}`", changes.pp_change); //Add the change
+        }
+        if changes.rAccuracy{
+            averageRankedAccuracy_formatted += &format!("\n`{}`", changes.rAccuracy_change);
+        }
+        println!("\nExisting User `{}` found! <ID:{}>\n", data.name, data.id); //Print out basic user data
     }
-    if changes.rScore{
-        totalRankedScore_formatted += &format!("\n`{}`", add_commas(changes.rScore_change, true));
-    }
-    if changes.tCount{
-        totalPlayCount_formatted += &format!(" `{}`", add_commas(changes.tCount_change, true));
-    }
-    if changes.rCount{
-        rankedPlayCount_formatted += &format!(" `{}`", add_commas(changes.rCount_change, true));
-    }
-    if changes.replays{
-        replaysWatched_formatted += &format!("\n`{}`", add_commas(changes.replays_change, true));
-    }
-    if changes.rank{
-        rank_formatted += &format!(" `{}`", add_commas(changes.rank_change, true));
-    }
-    if changes.cRank{
-        countryRank_formatted += &format!(" `{}`", add_commas(changes.cRank_change, true));
-    }
-    if changes.pp{
-        pp_formatted += &format!("\n`{}`", changes.pp_change); //Add the change
-    }
-    if changes.rAccuracy{
-        averageRankedAccuracy_formatted += &format!("\n`{}`", changes.rAccuracy_change);
+    else{ //If new use
+        println!("\nNew User `{}` created! <ID:{}>\n", data.name, data.id); //Print out basic user data and lets know user is new
     }
 
-    //Formatting the data being sent
+    //Function to make my own message look dark red
+    let mut color = 0; //Set default color to black
+    if data.name == "ColGuy20"{ //If it is me
+        color = 5505024; //Change color to dark red
+    }
+
+    //Making the payload (Formatted JSon that program gives to webhook to send)
     let payload = json!({ //The data is put in a JSon file for the discord webhook
         "embeds": [{
             "author": {
                 "name": format!("{} #{}", data.name, data.rank), //Username and global rank
                 "icon_url": format!("{}",data.profilePicture) //Profile Picture
             },
-            "color": 5505024,
+            "color": color,
             "fields": [
                 {
                     "name": "Description",
@@ -398,19 +410,20 @@ async fn send_to_discord(data: &PlayerData, changes: &Changes, success_count: &m
 //Main function
 #[tokio::main]
 async fn main() {
+    let player_id = "76561199396123565"; // Steam/ScoreSaber ID (In this case mine)
     let mut success_count: i64 = 0; //Goes up every time the loop runs
     let conn = Connection::open("player_data.db").expect("Failed to open database"); //Set up connection
     loop { //Loops every 10 minutes
-        match fetch_player_data_from_db(&conn) {  //Checks if fetching data from database goes successfully
+        match fetch_player_data_from_db(&conn, player_id) {  //Checks if fetching data from database goes successfully
             Ok(data_from_db) => {
-                match fetch_player_data().await { //Checks if fetching data from ScoreSabere API goes successfully
+                match fetch_player_data(player_id).await { //Checks if fetching data from ScoreSabere API goes successfully
                     Ok(data) => {
-                        if let Err(e) = insert_player_data(&conn, &data) { //Call function to insert data into databas
+                        if let Err(e) = insert_player_data(&conn, &data, &player_id) { //Call function to insert data into databas
                             println!("Error inserting data into database: {}", e); //Prints if inputing data into database results in failure
                         }
                         match compare_data(&data, &data_from_db) { //Call function to compare data
                             Ok(changes) => {
-                                if let Err(e) = send_to_discord(&data, &changes, &mut success_count).await { //Call function to send data to discord
+                                if let Err(e) = send_data_to_discord(&data, &changes, &mut success_count, false).await { //Call function to send data to discord
                                 println!("Error sending to Discord: {}", e); //Prints if sending to discord results in failure
                                 }
                             }
@@ -420,11 +433,25 @@ async fn main() {
                     Err(e) => println!("Error: {}", e), //Prints if fetching data from ScoreSaber API results in failure
                 }
             }
-            Err(err) => {
-                eprintln!("Error: {:?}", err); //Prints if fetching data from database results in failure
+            Err(rusqlite::Error::QueryReturnedNoRows) => { //If player data is not in database
+                // If no player data exists in the database, fetch it from the API and insert it
+                match fetch_player_data(player_id).await { //Fetch data from ScoreSaber API
+                    Ok(data) => {
+                        // Insert new data into the database
+                        if let Err(e) = insert_player_data(&conn, &data, &player_id) { //Call function to insert data into databas
+                            println!("Error inserting data into database: {}", e); //Prints if inputing data into database results in failure
+                        } else { //If inserting the player data into the database works
+                            if let Err(e) = send_data_to_discord(&data, &Changes::default(), &mut success_count, true).await { //Call function to send data to discord
+                                println!("Error sending to Discord: {}", e); //Prints if sending to discord results in failure
+                            }
+                        }
+                    }
+                    Err(e) => println!("Error fetching player data from API: {}", e), //Prints if fetching data from ScoreSaber API results in failure
+                }
             }
+            Err(e) => println!("Error fetching player data from database: {}", e), //Prints if fetching data from database results in failure
         }
-        let cooldown:u64 = 600; //Sets cooldown (in secs, 10 mins)
+        let cooldown:u64 = 60; //Sets cooldown (in secs, 10 mins)
         sleep(Duration::from_secs(cooldown)).await; //Waits 10 minutes before looping
     }
 }
