@@ -1,6 +1,6 @@
-use crate::PlayerData;
-use crate::Changes;
-use crate::imports::*;
+use crate::PlayerData; //PlayerData struct
+use crate::Changes; //Changes struct
+use crate::imports::*; //Imports
 
 //Comparing new-old data main function
 pub fn compare_data(data: &PlayerData, data_from_db: &PlayerData) -> Result<Changes, Error>{

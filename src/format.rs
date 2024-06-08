@@ -1,6 +1,6 @@
-use crate::PlayerData;
-use crate::Changes;
-use crate::imports::*;
+use crate::PlayerData; //PlayerData struct
+use crate::Changes; //Changes struct
+use crate::imports::*; //Imports
 
 //Function to add commas
 pub fn add_commas(mut num: i64, include_pos: bool) -> String {
@@ -30,15 +30,8 @@ pub fn add_commas(mut num: i64, include_pos: bool) -> String {
     result //return answer
 }
 
-//Function to send data to discord
-pub async fn send_stats_to_discord(data: &PlayerData, changes: &Changes, success_count: &mut i64, new_user: bool) -> Result<(), Error> { // Name of function and stating return type
-    let webhook_url = env::var("WEBHOOK_URL").unwrap_or_else(|_| String::from("Invalid webhook URL")); //Pulls WEBHOOK_URL from environment, if unable then prints invalid
-    if webhook_url == "Invalid webhook URL" {
-        println!("{}", webhook_url);
-    }
-    
-    let client = reqwest::Client::new(); //Setting the client
-
+//Function to format data
+pub fn formatdata(data: &PlayerData, changes: &Changes, new_user: bool) -> CreateMessage{ // Name of function and stating return type
     //Formatting data
     let mut totalScore_formatted = add_commas(data.scoreStats.totalScore, false); //add commas
     let mut totalRankedScore_formatted = add_commas(data.scoreStats.totalRankedScore, false); //add commas
@@ -83,79 +76,33 @@ pub async fn send_stats_to_discord(data: &PlayerData, changes: &Changes, success
         }
         //println!("\nExisting User `{}` found! <ID:{}>\n", data.name, data.id); //Print out basic user data
     }
-    /*else{ //If new use
+    else{ //If new use
         println!("\nNew User `{}` created! <ID:{}>\n", data.name, data.id); //Print out basic user data and lets know user is new
-    }*/
+    }
 
     //If-statement to make my own embed message look dark red
-    let mut color = 0; //Set default color to black
+    let mut my_color = 0; //Set default color to black
     if data.name == "ColGuy20"{ //If it is me
-        color = 5505024; //Change color to dark red
-    }
-
-    //Making the payload (Formatted JSon that program gives to webhook to send)
-    let payload = json!({ //The data is put in a JSon file for the discord webhook
-        "embeds": [{
-            "author": {
-                "name": format!("{} #{}", data.name, data.rank), //Username and global rank
-                "icon_url": format!("{}",data.profilePicture) //Profile Picture
-            },
-            "color": color,
-            "fields": [
-                {
-                    "name": "Description",
-                    "value": format!("Rank: **#{}**\nCountry Rank ({}): **#{}**\nFirst Seen: {}", rank_formatted, data.country, countryRank_formatted, firstSeen_formatted) //Rank, Country/Rank, and date first seen
-                },
-                {"name": "","value": ""}, //These are just for cosmetic purposes, they ensure that only two fields are in each row
-                {
-                    "name": "Total Score",
-                    "value": format!("{}", totalScore_formatted), //Total Score
-                    "inline": true //This states that this field and up to 2 other fields are in the same row
-                },
-                {
-                    "name": "Total Ranked Score",
-                    "value": format!("{}", totalRankedScore_formatted), //Total Ranked Score
-                    "inline": true             
-                },
-                {"name": "","value": ""},
-                {
-                    "name": "Average Ranked Accuracy",
-                    "value": format!("%{}", averageRankedAccuracy_formatted), //Average Ranked Accuracy
-                    "inline": true
-                },
-                {
-                    "name": "Performance Point (PP)",
-                    "value": format!("{}", pp_formatted), //Performance Points
-                    "inline": true
-                },
-                {"name": "","value": ""},
-                {
-                    "name": "Ranked Play Count",
-                    "value": format!("{} ", rankedPlayCount_formatted), //Ranked Play Count
-                    "inline": true
-                },
-                {
-                    "name": "Total Play Count",
-                    "value": format!("{} ", totalPlayCount_formatted), //Total Play Count
-                    "inline": true             
-                }
-            ]
-        }]
-    });
-    
-    //Sends to discord
-    let response = client.post(webhook_url)
-        .json(&payload)
-        .send()
-        .await?;
-    
-    //Checks if it worked properly
-    if response.status().is_success() {
-        *success_count += 1; // Increment the success count
-        println!("Message sent successfully to Discord [Success Count: {}]", success_count); // Prints if successful
-    } else {
-        println!("Failed to send message to Discord: {}", response.status()); //Prints if failure
+        my_color = 5505024; //Change color to dark red
     }
     
-    Ok(()) //Returns OK
+    //Making the payload (Embed message into CreateEmbed)
+    let payload = CreateMessage::new().embed(CreateEmbed::new() //Create message
+        .color(my_color) //Set color
+        .field("Description", format!("Rank: **#{}**\nCountry Rank ({}): **#{}**\nFirst Seen: {}", rank_formatted, data.country, countryRank_formatted, firstSeen_formatted), false) //Rank, Country/Rank, and date first seen
+        .field("", "", false) //These are just for cosmetic purposes, they ensure that only two fields are in each row
+        .field("Total Score", format!("{}", totalScore_formatted), true) //Total Score
+        .field("Total Ranked Score", format!("{}", totalRankedScore_formatted), true) //Total Ranked Score
+        .field("", "", false) //These are just for cosmetic purposes, they ensure that only two fields are in each row
+        .field("Average Ranked Accuracy", format!("%{}", averageRankedAccuracy_formatted), true) //Average Ranked Accuracy
+        .field("Performance Point (PP)", format!("{}", pp_formatted), true) //Performance Points
+        .field("", "", false) //These are just for cosmetic purposes, they ensure that only two fields are in each row
+        .field("Ranked Play Count", format!("{} ", rankedPlayCount_formatted), true) //Ranked Play Count
+        .field("Total Play Count", format!("{} ", totalPlayCount_formatted), true) //Total Play Count
+        .author(
+            CreateEmbedAuthor::new("Temp") //Add embedded author
+                .name(format!("{} #{}", data.name, data.rank)) //Username and global rank
+                .icon_url(format!("{}",data.profilePicture)) //Profile Picture
+        ));
+    payload //Return embedded payload
 }

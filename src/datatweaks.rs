@@ -1,6 +1,6 @@
-use crate::PlayerData;
-use crate::ScoreStats;
-use crate::imports::*;
+use crate::PlayerData; //PlayerData struct
+use crate::ScoreStats; //ScoreStats struct
+use crate::imports::*; //Imports
 
 //Function used to fetch/take in the data from Scoresaber
 pub async fn fetch_player_data(player_id: &str) -> Result<PlayerData, Error> { //Name of function and stating return type
