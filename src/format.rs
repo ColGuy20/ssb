@@ -77,7 +77,7 @@ pub fn formatdata(data: &PlayerData, changes: &Changes, new_user: bool) -> Creat
         //println!("\nExisting User `{}` found! <ID:{}>\n", data.name, data.id); //Print out basic user data
     }
     else{ //If new use
-        println!("\nNew User `{}` created! <ID:{}>\n", data.name, data.id); //Print out basic user data and lets know user is new
+        println!("\nNew User `{}` added to database! <ID:{}>\n", data.name, data.id); //Print out basic user data and lets know user is new
     }
 
     //If-statement to make my own embed message look dark red

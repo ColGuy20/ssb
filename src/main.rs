@@ -34,6 +34,11 @@ pub struct PlayerData {
     scoreStats: ScoreStats,
     firstSeen: String,
 }
+//
+#[derive(Debug, Serialize, Deserialize, Default)] //This is used for storing multiple players (for search function)
+pub struct PlayersData {
+    players: Vec<PlayerData>,
+}
 
 //Struct for changes in new-old
 #[derive(Debug, Serialize, Deserialize, Default)] //This struct has default in case of new user
@@ -63,11 +68,11 @@ pub struct Handler;// This struct is used for discord bot events
 #[async_trait]
 impl EventHandler for Handler{ //Implement EventHandler to handle discord events
     async fn ready(&self, _ctx: Context, ready: Ready) { //When discord triggers ready event
-        println!("\n{} is connected!", ready.user.name); //Prints ready and name of bot
+        println!("\n{} is connected!\n", ready.user.name); //Prints ready and name of bot
     }
     async fn message(&self, ctx: Context, msg: Message) { //Handle incoming messages
         let message = msg.content.as_str().split(' ').next().unwrap(); // First word of message taken in
-        if message.starts_with("/") && msg.author.name != "RustBot" { //If message starts with a "/" (command) and message is not sent by rustbot
+        if message.starts_with("!") && msg.author.name != "RustBot" { //If message starts with a "!" (command) and message is not sent by rustbot
             message::react_to_msg(ctx, msg).await; //Function to react to message
         }
     }
@@ -78,7 +83,14 @@ pub async fn send_stats(player_id: &str, ctx: Context, msg: Message) -> bool{
     let mut payload_new_user = true; //If new user
     let mut payload_data = PlayerData::default(); //Default data
     let mut payload_changes = Changes::default(); //Default changes
-    let conn = Connection::open("player_data.db").expect("Failed to open database"); //Set up connection
+
+    let conn = Connection::open("player_data.db").expect("Failed to open database"); //Set up connection for database
+
+    if let Err(e) = datatweaks::create_db(&conn) { //Function to create database if not exists
+        println!("Failed to initialize database: {}", e); //Failed to create database
+        return false; //Return false to show that function didn't operate properly
+    }
+
     match datatweaks::fetch_player_data_from_db(&conn, player_id) {  //Checks if fetching data from database goes successfully
         Ok(data_from_db) => { //If functioned correctly
             match datatweaks::fetch_player_data(player_id).await { //Checks if fetching data from ScoreSabere API goes successfully
@@ -96,7 +108,7 @@ pub async fn send_stats(player_id: &str, ctx: Context, msg: Message) -> bool{
                     }
                 },
                 Err(e) => {
-                    println!("Error: {}", e); //Prints if fetching data from ScoreSaber API results in failure
+                    println!("Error fetching data from API: {}", e); //Prints if fetching data from ScoreSaber API results in failure
                     return false; //Return false to show that function didn't operate properly
                 }
             }
