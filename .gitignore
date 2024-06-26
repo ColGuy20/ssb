@@ -1,3 +1,4 @@
 target
 start*
 ssb_query*
+.env*

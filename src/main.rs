@@ -141,7 +141,7 @@ pub async fn send_stats(player_id: &str, ctx: Context, msg: Message) -> bool{
 
 //Function to start the client
 async fn start_client() {
-    // Check if the token is properly retrieved
+    dotenv().ok(); // Load environment variables from .env file
     let token = match env::var("DISCORD_TOKEN") { //Retrieve token from environment
         Ok(token) => token, // If works then set token
         Err(_) => { //If failed
