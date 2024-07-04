@@ -6,7 +6,6 @@ pub use tokio::time::{sleep, Duration}; //Used for async/await and time-based op
 pub use std::env; //Used for interacting with environmental variables
 pub use rusqlite::{params, Connection, Result}; //Used to integrate database (SQLite) functions
 pub use std::collections::HashMap; //Used to create instances without needing to write the whole path each time
-pub use dotenv::dotenv; //used to interact with .enve file
 
 //Imports needed for discord bot
 pub use serenity::{

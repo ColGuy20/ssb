@@ -46,9 +46,13 @@ pub fn create_db(conn: &Connection) -> Result<()> {
 }
 
 // Function to insert data into database
-pub fn insert_player_data(conn: &Connection, data: &PlayerData, player_id: &str) -> Result<()> {
+pub fn insert_player_data(conn: &Connection, data: &PlayerData, new_user: bool) -> Result<()> {
+
     let mut stmt = conn.prepare("SELECT discord FROM player_data WHERE id = ?1")?;
-    let discord_id: String = stmt.query_row(params![player_id], |row| row.get(0))?;
+    let mut discord_id = String::from("NULL");
+    if !new_user { //If not new user
+        discord_id = stmt.query_row(params![data.id], |row| row.get(0))?;
+    }
 
     conn.execute(
         "INSERT OR REPLACE INTO player_data(
@@ -57,7 +61,7 @@ pub fn insert_player_data(conn: &Connection, data: &PlayerData, player_id: &str)
             replaysWatched, firstSeen, discord
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         params![
-            player_id,
+            data.id,
             data.name,
             data.profilePicture,
             data.country,

@@ -95,7 +95,7 @@ pub async fn send_stats(player_id: &str, ctx: Context, msg: Message) -> bool{
         Ok(data_from_db) => { //If functioned correctly
             match datatweaks::fetch_player_data(player_id).await { //Checks if fetching data from ScoreSabere API goes successfully
                 Ok(data) => { //If functioned correctly
-                    if let Err(e) = datatweaks::insert_player_data(&conn, &data, &player_id) { //Call function to insert data into databas
+                    if let Err(e) = datatweaks::insert_player_data(&conn, &data, false) { //Call function to insert data into databas
                         println!("Error inserting data into database: {}", e); //Prints if inputing data into database results in failure
                     }
                     match compare::compare_data(&data, &data_from_db) { //Call function to compare data
@@ -118,14 +118,14 @@ pub async fn send_stats(player_id: &str, ctx: Context, msg: Message) -> bool{
             match datatweaks::fetch_player_data(player_id).await { //Fetch data from ScoreSaber API
                 Ok(data) => { //If functioned correctly
                     // Insert new data into the database
-                    if let Err(e) = datatweaks::insert_player_data(&conn, &data, &player_id) { //Call function to insert data into databas
-                        println!("Error inserting data into database: {}", e); //Prints if inputing data into database results in failure
+                    if let Err(e) = datatweaks::insert_player_data(&conn, &data, true) { //Call function to insert data into databas
+                        println!("Error inserting data of new player into database: {}", e); //Prints if inputing data into database results in failure
                     } else { //If inserting the player data into the database works
                         payload_data = data; //Set data
                     }
                 }
                 Err(e) => {
-                    println!("Error fetching player data from API: {}", e); //Prints if fetching data from ScoreSaber API results in failure
+                    println!("Error fetching data of new player from API: {}", e); //Prints if fetching data from ScoreSaber API results in failure
                     return false; //Return false to show that function didn't operate properly
                 }
             }
@@ -141,7 +141,7 @@ pub async fn send_stats(player_id: &str, ctx: Context, msg: Message) -> bool{
 
 //Function to start the client
 async fn start_client() {
-    dotenv().ok(); // Load environment variables from .env file
+    // Check if the token is properly retrieved
     let token = match env::var("DISCORD_TOKEN") { //Retrieve token from environment
         Ok(token) => token, // If works then set token
         Err(_) => { //If failed
